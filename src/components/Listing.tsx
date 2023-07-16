@@ -5,26 +5,45 @@ import Button from 'react-bootstrap/Button';
 import Card from 'react-bootstrap/Card';
 import { Person } from "../types/person"
 import { useState, useRef, useEffect, Dispatch, SetStateAction } from "react";
-import { TimePicker } from '@mui/x-date-pickers/TimePicker';
 import moment from 'moment';
-import { log } from "console";
 
 interface Props {
   person: Person;
   selectedFormName: string | null;
   setSelectedFormName: Dispatch<SetStateAction<string | null>>;
+  alertSuccess: (name: string) => void;
+  alertFailure: (name: string) => void;
 }
 
-const Listing: React.FC<Props> = ({ person, selectedFormName, setSelectedFormName }: Props) => {
+const Listing: React.FC<Props> = ({ person, selectedFormName, setSelectedFormName, alertSuccess, alertFailure }: Props) => {
   const currentTime = moment().format('HH:mm');
   const [time, setTime] = useState<string>(currentTime);
   const [customerName, setCustomerName] = useState<string | null>(null);
-
   const cardRef = useRef<HTMLDivElement>(null);
-
+  const twilioLambdaBaseUrl = "https://jahqgbuyjfxwpdvvqjmabctzla0bquye.lambda-url.us-east-2.on.aws/"  
+  
   const handleClick = (e: React.MouseEvent) => {
     setSelectedFormName(selectedFormName !== person.name ? person.name : null);
   };
+
+  const handleSubmit = (e: React.MouseEvent) => {
+    sendSms(person.phone, customerName, time);
+    setSelectedFormName(null);
+    setTime(currentTime);
+    setCustomerName(null)
+  };
+
+  const sendSms = (phone: string, name:  string | null, time: string) => {
+    fetch(twilioLambdaBaseUrl + `?number=${phone}&name=${name}&time=${time}`)
+      .then(response => {
+        if (response.ok) { 
+          alertSuccess(person.name)
+        } else {
+          throw response
+        }
+      })
+      .catch(_err => alertFailure(person.name));
+  }
 
   useEffect(() => {
     if (selectedFormName === person.name && cardRef.current) {
@@ -59,7 +78,10 @@ const Listing: React.FC<Props> = ({ person, selectedFormName, setSelectedFormNam
                   </Form.Group>
                 </Form>
               </Card.Text>
-              <Button variant="primary">Check In</Button>
+              <Button
+                variant="primary"
+                onClick={(event: React.MouseEvent<HTMLButtonElement, MouseEvent>) => handleSubmit(event)}
+              >Check In</Button>
             </Card.Body>
           </Card>
         </Row>
